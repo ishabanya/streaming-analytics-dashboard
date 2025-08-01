@@ -1,0 +1,159 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: streaming-platform-app
+  labels:
+    app: streaming-platform
+    component: app
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: streaming-platform
+      component: app
+  template:
+    metadata:
+      labels:
+        app: streaming-platform
+        component: app
+    spec:
+      containers:
+      - name: streaming-app
+        image: streaming-platform:latest
+        ports:
+        - containerPort: 8501
+        env:
+        - name: PYTHONUNBUFFERED
+          value: "1"
+        - name: STREAMLIT_SERVER_PORT
+          value: "8501"
+        - name: STREAMLIT_SERVER_ADDRESS
+          value: "0.0.0.0"
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "250m"
+          limits:
+            memory: "1Gi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /_stcore/health
+            port: 8501
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /_stcore/health
+            port: 8501
+          initialDelaySeconds: 5
+          periodSeconds: 5
+        volumeMounts:
+        - name: app-data
+          mountPath: /app/data
+        - name: app-logs
+          mountPath: /app/logs
+        - name: app-exports
+          mountPath: /app/exports
+      volumes:
+      - name: app-data
+        persistentVolumeClaim:
+          claimName: streaming-data-pvc
+      - name: app-logs
+        persistentVolumeClaim:
+          claimName: streaming-logs-pvc
+      - name: app-exports
+        persistentVolumeClaim:
+          claimName: streaming-exports-pvc
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: streaming-etl-pipeline
+  labels:
+    app: streaming-platform
+    component: etl
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: streaming-platform
+      component: etl
+  template:
+    metadata:
+      labels:
+        app: streaming-platform
+        component: etl
+    spec:
+      containers:
+      - name: etl-pipeline
+        image: streaming-platform:latest
+        command: ["python", "etl_pipeline.py"]
+        env:
+        - name: PYTHONUNBUFFERED
+          value: "1"
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "100m"
+          limits:
+            memory: "512Mi"
+            cpu: "200m"
+        volumeMounts:
+        - name: app-data
+          mountPath: /app/data
+        - name: app-logs
+          mountPath: /app/logs
+      volumes:
+      - name: app-data
+        persistentVolumeClaim:
+          claimName: streaming-data-pvc
+      - name: app-logs
+        persistentVolumeClaim:
+          claimName: streaming-logs-pvc
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: streaming-log-producer
+  labels:
+    app: streaming-platform
+    component: producer
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: streaming-platform
+      component: producer
+  template:
+    metadata:
+      labels:
+        app: streaming-platform
+        component: producer
+    spec:
+      containers:
+      - name: log-producer
+        image: streaming-platform:latest
+        command: ["python", "log_producer.py", "--duration", "1440", "--rate", "5"]
+        env:
+        - name: PYTHONUNBUFFERED
+          value: "1"
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "50m"
+          limits:
+            memory: "256Mi"
+            cpu: "100m"
+        volumeMounts:
+        - name: app-data
+          mountPath: /app/data
+        - name: app-logs
+          mountPath: /app/logs
+      volumes:
+      - name: app-data
+        persistentVolumeClaim:
+          claimName: streaming-data-pvc
+      - name: app-logs
+        persistentVolumeClaim:
+          claimName: streaming-logs-pvc 
