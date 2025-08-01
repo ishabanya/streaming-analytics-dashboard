@@ -7,12 +7,8 @@ Deployable to Streamlit Cloud
 import streamlit as st
 import pandas as pd
 import plotly.express as px
-import plotly.graph_objects as go
-from plotly.subplots import make_subplots
 import time
 from datetime import datetime, timedelta
-import sys
-import os
 import random
 
 # Page configuration
