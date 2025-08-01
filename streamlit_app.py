@@ -13,129 +13,7 @@ import time
 from datetime import datetime, timedelta
 import sys
 import os
-import sqlite3
-import threading
-import queue
-
-# Add the project root to the Python path
-sys.path.append(os.path.dirname(os.path.abspath(__file__)))
-
-# Import our modules
-try:
-    from utils.database import DatabaseManager
-    from utils.metrics import MetricsCalculator
-    import config
-except ImportError:
-    # For Streamlit Cloud deployment, create simplified versions
-    st.error("Some modules not available. Running in demo mode.")
-    
-    # Create a simple demo database manager
-    class DatabaseManager:
-        def __init__(self):
-            self.demo_data = self._generate_demo_data()
-        
-        def _generate_demo_data(self):
-            """Generate demo data for Streamlit Cloud"""
-            import random
-            from datetime import datetime, timedelta
-            
-            # Generate demo logs
-            logs = []
-            end_time = datetime.now()
-            start_time = end_time - timedelta(hours=2)
-            
-            content_titles = [
-                "The Matrix", "Breaking Bad", "Planet Earth", "Live Sports Event",
-                "Friends", "Game of Thrones", "The Office", "Stranger Things",
-                "Black Mirror", "The Crown", "Narcos", "Money Heist"
-            ]
-            
-            device_types = ["mobile", "desktop", "tablet", "smart_tv"]
-            platforms = ["web", "ios", "android", "roku"]
-            countries = ["US", "UK", "CA", "AU", "DE", "FR", "JP", "BR"]
-            
-            for i in range(1000):
-                timestamp = start_time + timedelta(
-                    seconds=random.randint(0, int((end_time - start_time).total_seconds()))
-                )
-                
-                log = {
-                    'timestamp': timestamp,
-                    'event_type': random.choice(['play_started', 'playback_paused', 'playback_error']),
-                    'user_id': f"user_{random.randint(1000, 9999)}",
-                    'content_title': random.choice(content_titles),
-                    'device_type': random.choice(device_types),
-                    'platform': random.choice(platforms),
-                    'country': random.choice(countries),
-                    'duration': random.randint(1, 3600),
-                    'quality': random.choice(['240p', '360p', '480p', '720p', '1080p']),
-                    'error_type': random.choice(['network_error', 'playback_error', 'authentication_error']) if random.random() < 0.1 else None,
-                    'response_time': random.randint(100, 5000)
-                }
-                logs.append(log)
-            
-            return pd.DataFrame(logs)
-        
-        def get_logs_by_timeframe(self, start_time, end_time, table="processed_logs", limit=1000):
-            """Get logs within timeframe (demo version)"""
-            df = self.demo_data.copy()
-            df['timestamp'] = pd.to_datetime(df['timestamp'])
-            mask = (df['timestamp'] >= start_time) & (df['timestamp'] <= end_time)
-            return df[mask].head(limit)
-    
-    # Create a simple metrics calculator
-    class MetricsCalculator:
-        def get_all_metrics(self, logs_df):
-            """Calculate all metrics (demo version)"""
-            if logs_df.empty:
-                return {}
-            
-            # Calculate basic metrics
-            play_logs = logs_df[logs_df['event_type'] == 'play_started']
-            error_logs = logs_df[logs_df['event_type'] == 'playback_error']
-            
-            metrics = {
-                'plays_per_minute': {
-                    'plays_per_minute': len(play_logs) / 5,  # Assuming 5-minute window
-                    'total_plays': len(play_logs),
-                    'time_window': 5
-                },
-                'error_rates': {
-                    'error_rate': (len(error_logs) / len(logs_df) * 100) if len(logs_df) > 0 else 0,
-                    'total_errors': len(error_logs),
-                    'error_types': error_logs['error_type'].value_counts().to_dict() if not error_logs.empty else {}
-                },
-                'top_titles': [
-                    {'title': title, 'play_count': count, 'percentage': (count / len(play_logs) * 100) if len(play_logs) > 0 else 0}
-                    for title, count in play_logs['content_title'].value_counts().head(10).items()
-                ],
-                'user_engagement': {
-                    'active_users': logs_df['user_id'].nunique(),
-                    'avg_session_duration': logs_df['duration'].mean() if not logs_df.empty else 0,
-                    'engagement_score': len(play_logs) / logs_df['user_id'].nunique() if logs_df['user_id'].nunique() > 0 else 0
-                },
-                'geographic_distribution': logs_df['country'].value_counts().to_dict(),
-                'device_platform_stats': {
-                    'devices': logs_df['device_type'].value_counts().to_dict(),
-                    'platforms': logs_df['platform'].value_counts().to_dict()
-                },
-                'performance_metrics': {
-                    'avg_response_time': logs_df['response_time'].mean() if not logs_df.empty else 0,
-                    'buffer_underrun_rate': 1.2,  # Demo value
-                    'total_play_events': len(play_logs),
-                    'buffer_underruns': int(len(play_logs) * 0.012)
-                }
-            }
-            
-            return metrics
-
-# Initialize components
-@st.cache_resource
-def init_components():
-    """Initialize database and metrics components"""
-    return DatabaseManager(), MetricsCalculator()
-
-db_manager, metrics_calculator = init_components()
+import random
 
 # Page configuration
 st.set_page_config(
@@ -177,15 +55,157 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
+# Demo data generator for Streamlit Cloud
+class DemoDataGenerator:
+    """Generates realistic demo data for the streaming platform"""
+    
+    def __init__(self):
+        self.content_titles = [
+            "The Matrix", "Breaking Bad", "Planet Earth", "Live Sports Event",
+            "Friends", "Game of Thrones", "The Office", "Stranger Things",
+            "Black Mirror", "The Crown", "Narcos", "Money Heist",
+            "The Witcher", "Bridgerton", "Wednesday", "Wednesday Addams"
+        ]
+        self.device_types = ["mobile", "desktop", "tablet", "smart_tv", "gaming_console"]
+        self.platforms = ["web", "ios", "android", "roku", "fire_tv", "apple_tv"]
+        self.countries = ["US", "UK", "CA", "AU", "DE", "FR", "JP", "BR", "IN", "MX"]
+        self.qualities = ["240p", "360p", "480p", "720p", "1080p", "4K"]
+        self.error_types = ["network_error", "playback_error", "authentication_error", "content_not_found"]
+        
+    def generate_demo_data(self, hours_back=2):
+        """Generate demo data for the specified time range"""
+        logs = []
+        end_time = datetime.now()
+        start_time = end_time - timedelta(hours=hours_back)
+        
+        # Generate more realistic data distribution
+        total_events = random.randint(800, 1200)
+        
+        for i in range(total_events):
+            timestamp = start_time + timedelta(
+                seconds=random.randint(0, int((end_time - start_time).total_seconds()))
+            )
+            
+            # Weighted event types (more plays, fewer errors)
+            event_weights = [0.6, 0.2, 0.05, 0.1, 0.03, 0.02]  # play, pause, stop, error, seek, quality_change
+            event_type = random.choices(
+                ['play_started', 'playback_paused', 'playback_stopped', 'playback_error', 'playback_seek', 'quality_changed'],
+                weights=event_weights
+            )[0]
+            
+            # Generate error type only for error events
+            error_type = None
+            if event_type == 'playback_error':
+                error_type = random.choice(self.error_types)
+            
+            log = {
+                'timestamp': timestamp,
+                'event_type': event_type,
+                'user_id': f"user_{random.randint(1000, 9999)}",
+                'content_title': random.choice(self.content_titles),
+                'device_type': random.choice(self.device_types),
+                'platform': random.choice(self.platforms),
+                'country': random.choice(self.countries),
+                'duration': random.randint(1, 3600),
+                'quality': random.choice(self.qualities),
+                'error_type': error_type,
+                'response_time': random.randint(100, 5000)
+            }
+            logs.append(log)
+        
+        return pd.DataFrame(logs)
+
+# Initialize demo data generator
+@st.cache_resource
+def get_demo_data_generator():
+    return DemoDataGenerator()
+
+demo_generator = get_demo_data_generator()
+
+# Metrics calculator
+class MetricsCalculator:
+    """Calculates various metrics from streaming platform logs"""
+    
+    def get_all_metrics(self, logs_df):
+        """Calculate all metrics for the dashboard"""
+        if logs_df.empty:
+            return {}
+        
+        # Calculate basic metrics
+        play_logs = logs_df[logs_df['event_type'] == 'play_started']
+        error_logs = logs_df[logs_df['event_type'] == 'playback_error']
+        
+        # Calculate plays per minute (assuming 5-minute window)
+        time_window_minutes = 5
+        plays_per_minute = len(play_logs) / time_window_minutes if time_window_minutes > 0 else 0
+        
+        # Calculate error rate
+        error_rate = (len(error_logs) / len(logs_df) * 100) if len(logs_df) > 0 else 0
+        
+        # Calculate user engagement
+        active_users = logs_df['user_id'].nunique()
+        avg_session_duration = logs_df['duration'].mean() if not logs_df.empty else 0
+        engagement_score = len(play_logs) / active_users if active_users > 0 else 0
+        
+        # Calculate performance metrics
+        avg_response_time = logs_df['response_time'].mean() if not logs_df.empty else 0
+        total_play_events = len(play_logs)
+        buffer_underruns = int(total_play_events * 0.012)  # 1.2% buffer underrun rate
+        buffer_underrun_rate = (buffer_underruns / total_play_events * 100) if total_play_events > 0 else 0
+        
+        metrics = {
+            'plays_per_minute': {
+                'plays_per_minute': plays_per_minute,
+                'total_plays': len(play_logs),
+                'time_window': time_window_minutes
+            },
+            'error_rates': {
+                'error_rate': error_rate,
+                'total_errors': len(error_logs),
+                'error_types': error_logs['error_type'].value_counts().to_dict() if not error_logs.empty else {}
+            },
+            'top_titles': [
+                {'title': title, 'play_count': count, 'percentage': (count / len(play_logs) * 100) if len(play_logs) > 0 else 0}
+                for title, count in play_logs['content_title'].value_counts().head(10).items()
+            ],
+            'user_engagement': {
+                'active_users': active_users,
+                'avg_session_duration': avg_session_duration,
+                'engagement_score': engagement_score
+            },
+            'geographic_distribution': logs_df['country'].value_counts().to_dict(),
+            'device_platform_stats': {
+                'devices': logs_df['device_type'].value_counts().to_dict(),
+                'platforms': logs_df['platform'].value_counts().to_dict()
+            },
+            'performance_metrics': {
+                'avg_response_time': avg_response_time,
+                'buffer_underrun_rate': buffer_underrun_rate,
+                'total_play_events': total_play_events,
+                'buffer_underruns': buffer_underruns
+            }
+        }
+        
+        return metrics
+
+@st.cache_resource
+def get_metrics_calculator():
+    return MetricsCalculator()
+
+metrics_calculator = get_metrics_calculator()
+
 def get_recent_data(minutes: int = 30):
-    """Get recent data from the database"""
+    """Get recent data from demo generator"""
+    hours_back = minutes / 60
+    logs_df = demo_generator.generate_demo_data(hours_back=max(1, hours_back))
+    
+    # Filter for the specified time range
     end_time = datetime.now()
     start_time = end_time - timedelta(minutes=minutes)
     
-    # Get processed logs
-    logs_df = db_manager.get_logs_by_timeframe(start_time, end_time, table="processed_logs")
-    
-    return logs_df
+    logs_df['timestamp'] = pd.to_datetime(logs_df['timestamp'])
+    mask = (logs_df['timestamp'] >= start_time) & (logs_df['timestamp'] <= end_time)
+    return logs_df[mask]
 
 def display_header():
     """Display the main header"""
